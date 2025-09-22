@@ -6,6 +6,7 @@ import glob
 gwf = Workflow()
 
 starting_dir = "/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024/{}/filteredVCF/bcf_step1/"
+starting_dir_gvcf = "/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024/{}/gVCF/"
 metadata_path = "/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024_metadata/"
 zarr_dir = "zarr_data/"
 
@@ -51,23 +52,41 @@ for folder in metadata_folders:
         reference = metadata_df.loc[metadata_df.GVCF_FOLDER == GVCF_FOLDER].REFERENCE_FOLDER.unique()
         all_chr_file = starting_dir.format(GVCF_FOLDER)+"{}_all_chr.sorted.bcf".format(GVCF_FOLDER)
         if not os.path.exists(all_chr_file):
-            print("Problem with ", GVCF_FOLDER)
+            print("Filtered VCF does not exist ", GVCF_FOLDER)
             continue
         zarr_input = []
         # Chromosome X
         zarr_input.extend(regions_df.loc[(regions_df.END >= 1000000) &
                                       (regions_df.FEMALE_PLOIDY == 2) &
                                       (regions_df.MALE_PLOIDY == 1) &
-              (regions_df.REFERENCE_FOLDER == reference[0])].CONTIG_ID.unique())
+              (regions_df.REFERENCE_FOLDER == reference[0])].CONTIG_ID.unique()[:2])
         # Autosomes
         zarr_input.extend(regions_df.loc[(regions_df.END >= 1000000) &
                                       (regions_df.FEMALE_PLOIDY == 2) &
                                       (regions_df.MALE_PLOIDY == 2) &
-              (regions_df.REFERENCE_FOLDER == reference[0])].CONTIG_ID.unique()[:1])
+              (regions_df.REFERENCE_FOLDER == reference[0])].CONTIG_ID.unique()[:2])
         out_path = zarr_dir+GVCF_FOLDER+"/"
         os.makedirs(out_path, exist_ok=True)
         gwf.map(generate_zarr, zarr_input, name=get_ID_vcf,
                 extra={"all_chr": all_chr_file, "out_path": out_path})
+        # # Chromosome Y needs a different input file as it isn't part of the filteredVCF input.
+        # I'm shuttering it for now - need at the very least bed files and PAR identification to be useful
+        # y_inputs = regions_df.loc[(regions_df.END >= 1000000) &
+        #                               (regions_df.FEMALE_PLOIDY == 0) &
+        #                               (regions_df.MALE_PLOIDY == 1) &
+        #       (regions_df.REFERENCE_FOLDER == reference[0])]
+        # zarr_input = y_inputs.CONTIG_ID.unique()[:2]
+        # if len(y_inputs["BATCH"]) != 1:
+        #     # if len(y_inputs["BATCH"]) > 1:
+        #     #     print("Y chromosome is present in", len(y_inputs["BATCH"]), "batches")
+        #     continue
+        # batch = y_inputs["BATCH"].iloc[0]
+        # y_file = starting_dir_gvcf.format(GVCF_FOLDER)+"{}_batch_{}_fploidy_0_mploidy_1_gt.gvcf.gz".format(GVCF_FOLDER, batch)
+        # if not os.path.exists(y_file):
+        #     print("Batch does not exist ", y_file)
+        #     continue
+        # gwf.map(generate_zarr, zarr_input, name=get_ID_vcf,
+        #         extra={"all_chr": y_file, "out_path": out_path})
 
 
 # test_dir = [{"refname": "Papio_cynocephalus_ssp", "out_path": "data/Papio_cynocephalus_ssp/"},
