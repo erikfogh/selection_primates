@@ -96,7 +96,7 @@ for c in glob.glob(zarr_path+"/*"):
     ds = sg.load_dataset(c)
     if len(ds.variants) < 10:
         print("Skipping due to too few variants")
-    var_chunk = min(50, 1+len(ds.variants)//10000)
+    var_chunk = min(50, 1+len(ds.variants)//1000000)
     print(c, len(ds.variants), var_chunk)
     ds["sample_cohort"] = ds["samples"]
     # Subsetting and windowing the sgkit dataset.
@@ -104,9 +104,9 @@ for c in glob.glob(zarr_path+"/*"):
     ds["call_genotype"] = ds["call_genotype"].clip(0)
     ds = ds.sel(contigs=[ds.variant_contig[0].values])
     ds = sg.window_by_position(ds, size=window_size)
-    ds = (sg.diversity(ds.chunk({"variants": len(ds.variants)//var_chunk}))) # Create 50 chunks
+    ds = (sg.diversity(ds.chunk({"variants": len(ds.variants)//var_chunk}))) # Create at most 50 chunks
     for i in range(len(ds.sample_id)):
-        df_sub = pd.DataFrame({"het": ds.stat_diversity[:,i], "GVCF_ID": ds.sample_id[i].values})
+        df_sub = pd.DataFrame({"het": ds.stat_diversity[:,i], "variant_count": ds.window_stop-ds.window_start, "GVCF_ID": ds.sample_id[i].values})
         df_sub["window_start"] = list(range(0, len(ds.window_start)*window_size, window_size))
         df_sub["chrom"] = c.split("/")[-1]
         df_l.append(df_sub)

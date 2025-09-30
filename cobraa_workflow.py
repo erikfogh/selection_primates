@@ -41,14 +41,14 @@ def generate_multihetsep(refname, vcf, contig, mask, callability):
     return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
 
 
-def cobraa_run(multihetsep_l, ts, te):
+def cobraa_run(multihetsep_l, ts, te, chrom, mem=30):
     refname = multihetsep_l[0].split("/")[-1].split("_")[0]
-    out_path = "steps/cobraa/"+refname+"_D50_ts{}_te{}_".format(ts, te)
+    out_path = "steps/cobraa/"+refname+"/"+chrom+"_D50_ts{}_te{}_".format(ts, te)
     inputs = multihetsep_l
     outputs = [out_path+"final_parameters.txt"]
     options = {
         "cores": 3,
-        "memory": "30g",
+        "memory": "{}g".format(mem),
         "walltime": "12:00:00",
         "account": "baboondiversity"
     }
@@ -181,88 +181,88 @@ for d in metadata_dirs[:5]:
 #         #             extra={"ts": j, "te": i})
 
 
-# Test of the old baboondiversity to compare.
+# # Test of the old baboondiversity to compare.
 
 
-def generate_multihetsep_baboon(refname, vcf, mask, callability):
-    refname_batch = refname+"_"+vcf.split("/")[-1].split(".")[0]
-    multihetsep_name = refname_batch+".txt"
-    out_path = multihetsep_name
-    inputs = [vcf, mask, callability]
-    outputs = ["steps/multihetsep/"+refname+"/"+out_path]
-    options = {
-        "cores": 2,
-        "memory": "14g",
-        "walltime": "12:00:00",
-        "account": "baboondiversity"
-    }
-    spec = """
-    bcftools view -Ou -s {refname} {vcf} | bcftools view -Oz -g ^miss > steps/multihetsep/{refname}/{refname_batch}_temp.vcf.gz
-    python cobraa/msmc-tools/generate_multihetsep.py --negative_mask={mask} steps/multihetsep/{refname}/{refname_batch}_temp.vcf.gz>steps/multihetsep/{refname}/{out_path}
-    rm steps/multihetsep/{refname}/{refname_batch}_temp.vcf.gz
-    """.format(vcf=vcf, refname=refname, refname_batch=refname_batch, mask=mask, out_path=out_path)
-    #print(spec)
-    return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
+# def generate_multihetsep_baboon(refname, vcf, mask, callability):
+#     refname_batch = refname+"_"+vcf.split("/")[-1].split(".")[0]
+#     multihetsep_name = refname_batch+".txt"
+#     out_path = multihetsep_name
+#     inputs = [vcf, mask, callability]
+#     outputs = ["steps/multihetsep/"+refname+"/"+out_path]
+#     options = {
+#         "cores": 2,
+#         "memory": "14g",
+#         "walltime": "12:00:00",
+#         "account": "baboondiversity"
+#     }
+#     spec = """
+#     bcftools view -Ou -s {refname} {vcf} | bcftools view -Oz -g ^miss > steps/multihetsep/{refname}/{refname_batch}_temp.vcf.gz
+#     python cobraa/msmc-tools/generate_multihetsep.py --negative_mask={mask} steps/multihetsep/{refname}/{refname_batch}_temp.vcf.gz>steps/multihetsep/{refname}/{out_path}
+#     rm steps/multihetsep/{refname}/{refname_batch}_temp.vcf.gz
+#     """.format(vcf=vcf, refname=refname, refname_batch=refname_batch, mask=mask, out_path=out_path)
+#     #print(spec)
+#     return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
 
 
-def cobraa_run_unstructured_baboon(multihetsep_l, bnames, mem=30):
-    refname = multihetsep_l[0].split("/")[-2]
-    out_path = "steps/cobraa/"+refname+bnames+"_"
-    inputs = multihetsep_l
-    outputs = [out_path+"final_parameters.txt"]
-    options = {
-        "cores": 3,
-        "memory": "{}g".format(mem),
-        "walltime": "12:00:00",
-        "account": "baboondiversity"
-    }
-    spec = """
-    python cobraa/cobraa.py -in {infiles} -o {out_path} -D 50 -b 100 -its 20
-    """.format(infiles=" ".join(multihetsep_l), out_path=out_path)
-    #print(spec)
-    return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
+# def cobraa_run_unstructured_baboon(multihetsep_l, bnames, mem=30):
+#     refname = multihetsep_l[0].split("/")[-2]
+#     out_path = "steps/cobraa/"+refname+bnames+"_"
+#     inputs = multihetsep_l
+#     outputs = [out_path+"final_parameters.txt"]
+#     options = {
+#         "cores": 3,
+#         "memory": "{}g".format(mem),
+#         "walltime": "12:00:00",
+#         "account": "baboondiversity"
+#     }
+#     spec = """
+#     python cobraa/cobraa.py -in {infiles} -o {out_path} -D 50 -b 100 -its 20
+#     """.format(infiles=" ".join(multihetsep_l), out_path=out_path)
+#     #print(spec)
+#     return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
 
 
-def get_ID_unstructured_cobraa_baboon(idx, target):
-    print(target.spec)
-    filename = target.spec.split("/")[-1].split("_")[0]+"_"+target.spec.split("/")[-1].split(" ")[0]
-    return 'unstructured_cobraa_{}'.format(filename)
+# def get_ID_unstructured_cobraa_baboon(idx, target):
+#     print(target.spec)
+#     filename = target.spec.split("/")[-1].split("_")[0]+"_"+target.spec.split("/")[-1].split(" ")[0]
+#     return 'unstructured_cobraa_{}'.format(filename)
 
 
-# for d in ["/home/eriks/baboondiversity/people/eriks/second_analysis_baboons/data/Papio_metadata_with_clustering_sci.txt"]:
-#     # Identify IDs
-#     dir_metadata = pd.read_csv(d, sep =" ")
-#     picked_inds = ["PD_0214", "PD_0693"]
-#     for gvcf_folder in ["pass"]:
-#         vcf_name = "/home/eriks/baboondiversity/data/PG_panu3_phased_chromosomes_4_7_2021/chr{}/chr{}.phased.rehead.vcf.gz"
-#         mask_names = "/home/eriks/baboondiversity/data/callability_panu3_26_04_2021/chr{}sorted.bed.gz"
-#         multihetsep_args = []
-#         for b in ["{}".format(x) if x<= 20 else "X" for x in range(1, 22)]:
-#             for i in picked_inds:
-#                 os.makedirs(hetsep_dir+"/"+i, exist_ok=True)
-#                 ind_dir = {}
-#                 ind_dir["refname"] = i
-#                 ind_dir["vcf"] = vcf_name.format(b, b)
-#                 ind_dir["mask"] = mask_names.format(b)
-#                 ind_dir["callability"] = mask_names.format(b)
-#                 multihetsep_args.append(ind_dir)
-#         multihetsep_o = gwf.map(generate_multihetsep_baboon, multihetsep_args)
-#         hetsep_l = []
-#         for i in picked_inds:
-#             # Aut run
-#             b_list = []
-#             for b in range(1, 21):
-#                 b_list.append("steps/multihetsep/{}/{}_chr{}.txt".format(i, i, b))
-#                 hetsep_l.append({"multihetsep_l": ["steps/multihetsep/{}/{}_chr{}.txt".format(i, i, b)],
-#                 "bnames": "_chr{}".format(b)})
-#             hetsep_l.append({"multihetsep_l": b_list, "bnames": "_aut",
-#                              "mem": 60})
+# # for d in ["/home/eriks/baboondiversity/people/eriks/second_analysis_baboons/data/Papio_metadata_with_clustering_sci.txt"]:
+# #     # Identify IDs
+# #     dir_metadata = pd.read_csv(d, sep =" ")
+# #     picked_inds = ["PD_0214", "PD_0693"]
+# #     for gvcf_folder in ["pass"]:
+# #         vcf_name = "/home/eriks/baboondiversity/data/PG_panu3_phased_chromosomes_4_7_2021/chr{}/chr{}.phased.rehead.vcf.gz"
+# #         mask_names = "/home/eriks/baboondiversity/data/callability_panu3_26_04_2021/chr{}sorted.bed.gz"
+# #         multihetsep_args = []
+# #         for b in ["{}".format(x) if x<= 20 else "X" for x in range(1, 22)]:
+# #             for i in picked_inds:
+# #                 os.makedirs(hetsep_dir+"/"+i, exist_ok=True)
+# #                 ind_dir = {}
+# #                 ind_dir["refname"] = i
+# #                 ind_dir["vcf"] = vcf_name.format(b, b)
+# #                 ind_dir["mask"] = mask_names.format(b)
+# #                 ind_dir["callability"] = mask_names.format(b)
+# #                 multihetsep_args.append(ind_dir)
+# #         multihetsep_o = gwf.map(generate_multihetsep_baboon, multihetsep_args)
+# #         hetsep_l = []
+# #         for i in picked_inds:
+# #             # Aut run
+# #             b_list = []
+# #             for b in range(1, 21):
+# #                 b_list.append("steps/multihetsep/{}/{}_chr{}.txt".format(i, i, b))
+# #                 hetsep_l.append({"multihetsep_l": ["steps/multihetsep/{}/{}_chr{}.txt".format(i, i, b)],
+# #                 "bnames": "_chr{}".format(b)})
+# #             hetsep_l.append({"multihetsep_l": b_list, "bnames": "_aut",
+# #                              "mem": 60})
 
-#             x_list = []
-#             for b in ["X"]:
-#                 x_list.append("steps/multihetsep/{}/{}_chr{}.txt".format(i, i, b))
-#             hetsep_l.append({"multihetsep_l": ["steps/multihetsep/{}/{}_chr{}.txt".format(i, i, b)],
-#                 "bnames": "_chr{}".format(b)})
-#         # Unstructured
-#         gwf.map(cobraa_run_unstructured_baboon, hetsep_l,
-#                 name=get_ID_unstructured_cobraa_baboon)
+# #             x_list = []
+# #             for b in ["X"]:
+# #                 x_list.append("steps/multihetsep/{}/{}_chr{}.txt".format(i, i, b))
+# #             hetsep_l.append({"multihetsep_l": ["steps/multihetsep/{}/{}_chr{}.txt".format(i, i, b)],
+# #                 "bnames": "_chr{}".format(b)})
+# #         # Unstructured
+# #         gwf.map(cobraa_run_unstructured_baboon, hetsep_l,
+# #                 name=get_ID_unstructured_cobraa_baboon)
