@@ -12,7 +12,7 @@ out_path = "results/window_stats/"
 window_size = 100 # In kb
 
 
-def analyse_zarr_het(zarr_dir, metadata, window_size, out_path):
+def analyse_zarr_het_hom(zarr_dir, metadata, window_size, out_path):
     inputs = [zarr_dir]
     long_form = zarr_dir.split("/")[-1]
     outputs = ["{}{}_{}kb_het.txt".format(out_path, long_form, window_size)]
@@ -23,7 +23,7 @@ def analyse_zarr_het(zarr_dir, metadata, window_size, out_path):
         "account": "baboondiversity"
     }
     spec = """
-    python scripts/zarr_analysis_het.py -i {zarr_dir} -m {metadata} -w {window_size} -o {out_path}
+    python scripts/zarr_analysis_het_hom.py -i {zarr_dir} -m {metadata} -w {window_size} -o {out_path}
     """.format(zarr_dir=zarr_dir, metadata=metadata, window_size=window_size, out_path=out_path)
     # print(outputs, spec)
     return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
@@ -63,4 +63,4 @@ for x in glob.glob(zarr_path+"*")[:]:
     d["window_size"] = window_size
     d["out_path"] = out_path
     map_input.append(d)
-gwf.map(analyse_zarr_het, map_input, name=get_ID_analyse_het)
+gwf.map(analyse_zarr_het_hom, map_input, name=get_ID_analyse_het)
