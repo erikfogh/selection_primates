@@ -42,10 +42,10 @@ def generate_multihetsep(refname, vcf, contig, mask, callability):
 
 
 def cobraa_run(multihetsep_l, ts, te, chrom, mem=30):
-    refname = multihetsep_l[0].split("/")[-1].split("_")[0]
+    refname = multihetsep_l[0].split("/")[-2]
     out_path = "steps/cobraa/"+refname+"/"+chrom+"_D50_ts{}_te{}_".format(ts, te)
     inputs = multihetsep_l
-    outputs = [out_path+"final_parameters.txt"]
+    outputs = out_path+"final_parameters.txt"
     options = {
         "cores": 3,
         "memory": "{}g".format(mem),
@@ -63,7 +63,7 @@ def cobraa_run_unstructured(multihetsep_l, chrom, mem=30):
     refname = multihetsep_l[0].split("/")[-2]
     out_path = "steps/cobraa/"+refname+"/"+chrom+"_"
     inputs = multihetsep_l
-    outputs = [out_path+"final_parameters.txt"]
+    outputs = out_path+"final_parameters.txt"
     options = {
         "cores": 3,
         "memory": "{}g".format(mem),
@@ -77,6 +77,25 @@ def cobraa_run_unstructured(multihetsep_l, chrom, mem=30):
     return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
 
 
+def cobraa_decode(multihetsep_l, chrom, mem=120):
+    refname = multihetsep_l[0].split("/")[-2]
+    out_path = "steps/cobraa/"+refname+"/"+chrom+"_"
+    inputs = multihetsep_l
+    outputs = [out_path+"final_parameters.txt"]
+    options = {
+        "cores": 6,
+        "memory": "{}g".format(mem),
+        "walltime": "12:00:00",
+        "account": "baboondiversity"
+    }
+    spec = """
+
+    python cobraa/cobraa.py -in {infiles} -o {out_path} -D 50 -b 25 -its 20 -spread_1 0.025 -spread_2 50 
+    """.format(infiles=" ".join(multihetsep_l), out_path=out_path)
+    # print(spec)
+    return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
+
+
 def get_ID_vcf(idx, target):
     #print(target.spec)
     filename = target.spec.split("/")[-2]+"_"+target.spec.split("/")[-1].split("_temp")[0]
@@ -84,7 +103,7 @@ def get_ID_vcf(idx, target):
 
 def get_ID_unstructured_cobraa(idx, target):
     #print(target.spec)
-    filename = target.spec.split("/")[-2]+"_"+target.spec.split("/")[-1].split(" ")[0]
+    filename = target.spec.split("/")[-2]+"_"+target.spec.split("/")[-1].split("_")[0]
     return 'unstructured_cobraa_{}'.format(filename)
 
 def get_ID_structured_cobraa(idx, target):
@@ -100,8 +119,9 @@ os.makedirs(cobraa_dir, exist_ok=True)
 
 metadata_dirs = glob.glob(metadata_dir+"*_individuals.txt")
 
+chr_cut = 2
 
-for d in metadata_dirs[:5]:
+for d in metadata_dirs[:1]:
     # Identify IDs
     dir_metadata = pd.read_csv(d, sep="\t")
     dir_metadata["gss"] = dir_metadata.GENUS+"_"+dir_metadata.SPECIES+"_"+dir_metadata.SUBSPECIES
@@ -120,21 +140,25 @@ for d in metadata_dirs[:5]:
     region_metadata = pd.read_csv(metadata_dir+short_species+"_regions_and_batches.txt",
                            sep="\t")
     # Go through every unique genotype calling set.
-    for gvcf_folder in sorted_input.GVCF_FOLDER.unique():
-        # print(gvcf_folder)
+    for gvcf_folder in sorted_input.GVCF_FOLDER.unique()[:1]:
+        print("Using", gvcf_folder)
         # Pick the (currently one) best individuals in the metadata.
         picked_inds = sorted_input.loc[sorted_input.GVCF_FOLDER == gvcf_folder].GVCF_ID.iloc[:1]
-        inds_cobraa = []
         # Choose all paths based on the regions file.
         batch_name = "{}/filteredVCF/bcf_step1/{}_batch{}_fploidy2_mploidy{}.bcf"
         gvcfs_names = starting_dir+batch_name
         mask_names = starting_dir+"{}/filteredVCF/pos_bed_cov_based/{}_batch{}_fploidy2_mploidy{}.bed"
         multihetsep_args = []
         # Workflow selecting all autosomal chromosomes above 1Mb in size.
-        aut_and_x = region_metadata.loc[(region_metadata.FEMALE_PLOIDY == 2) &
-                                     (region_metadata.END >= size_cutoff)]
+        aut_l = region_metadata.loc[(region_metadata.FEMALE_PLOIDY == 2) &
+                                    (region_metadata.MALE_PLOIDY == 2) &
+                                     (region_metadata.END >= size_cutoff)][:chr_cut]
+        x_l = region_metadata.loc[(region_metadata.FEMALE_PLOIDY == 2) &
+                                  (region_metadata.MALE_PLOIDY == 1) &
+                                     (region_metadata.END >= size_cutoff)][:chr_cut]
+        aut_and_x = pd.concat([aut_l, x_l])
         # print(aut_and_x)
-        for c in aut_and_x.CONTIG_ID.unique()[:1]:
+        for c in aut_and_x.CONTIG_ID.unique():
             # Batches are either aut/Y-linked or X-linked.
             mploidy = aut_and_x.loc[aut_and_x.CONTIG_ID == c].MALE_PLOIDY.iloc[0]
             b = aut_and_x.loc[aut_and_x.CONTIG_ID == c].BATCH.iloc[0]
@@ -148,22 +172,20 @@ for d in metadata_dirs[:5]:
                     ind_dir["mask"] = mask_names.format(gvcf_folder, gvcf_folder, b, mploidy)
                     ind_dir["callability"] = mask_names.format(gvcf_folder, gvcf_folder, b, mploidy)
                     multihetsep_args.append(ind_dir)
-                    inds_cobraa.append(i)
                 else:
                     print(gvcfs_names.format(gvcf_folder, gvcf_folder, b, mploidy), "does not exist")
-        # print(multihetsep_args)
         multihetsep_o = gwf.map(generate_multihetsep, multihetsep_args, name=get_ID_vcf)
         hetsep_l = []
-        for i in inds_cobraa:
+        for i in picked_inds:
             os.makedirs(cobraa_dir+"/"+i, exist_ok=True)
             # Aut run
             c_list = []
-            for c in aut_and_x.CONTIG_ID.unique()[:1]:
+            for c in aut_l.CONTIG_ID.unique():
                 c_list.append("steps/multihetsep/{}/{}.txt".format(i, c))
-                hetsep_l.append({"multihetsep_l": ["steps/multihetsep/{}/{}.txt".format(i, c)],
-                "chrom": c})
-            # hetsep_l.append({"multihetsep_l": c_list, "chrom": "_aut",
-            #                  "mem": 120})
+                # hetsep_l.append({"multihetsep_l": ["steps/multihetsep/{}/{}.txt".format(i, c)],
+                # "chrom": c})
+            hetsep_l.append({"multihetsep_l": c_list, "chrom": "aut",
+                             "mem": 60})
 
         #     x_list = []
         #     for b in region_metadata.loc[(region_metadata.FEMALE_PLOIDY == 2) &
@@ -174,11 +196,21 @@ for d in metadata_dirs[:5]:
         # Unstructured
         gwf.map(cobraa_run_unstructured, hetsep_l,
                 name=get_ID_unstructured_cobraa)
-#         # for i in range(10, 40, 2):
-#         #     for j in range(4, i-4, 2):
-#         #         gwf.map(cobraa_run, hetsep_l,
-#         #             name=get_ID_structured_cobraa,
-#         #             extra={"ts": j, "te": i})
+        for d in hetsep_l:
+            i_l = []
+            for i in range(10, 42, 6):
+                for j in range(4, i-4, 6):
+                    l = d.copy()
+                    l["ts"] = j
+                    l["te"] = i
+                    i_l.append(l)
+            i_structured = gwf.map(cobraa_run, i_l,
+                                   name=get_ID_structured_cobraa)
+            # Pick best and perform cobraa-path.
+            print(i_structured.outputs)
+            # gwf.map(cobraa_decode, i_structured.outputs)
+
+
 
 
 # # Test of the old baboondiversity to compare.
