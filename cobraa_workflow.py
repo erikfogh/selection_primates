@@ -135,6 +135,7 @@ metadata_dirs = ['/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024_m
                  '/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024_metadata/Cercopithecus_individuals.txt']
 
 chr_cut = 2
+ind_cut = 2
 
 for d in metadata_dirs:
     # Identify IDs
@@ -157,15 +158,14 @@ for d in metadata_dirs:
     region_metadata = pd.read_csv(metadata_dir+short_species+"_regions_and_batches.txt",
                            sep="\t")
     # Go through every unique genotype calling set.
-    for gvcf_folder in sorted_input.GVCF_FOLDER.unique()[:3]:
+    for gvcf_folder in sorted_input.GVCF_FOLDER.unique()[:6]:
         print("Using", gvcf_folder)
         # Pick the (currently one) best individuals in the metadata.
-        picked_inds = sorted_input.loc[sorted_input.GVCF_FOLDER == gvcf_folder].GVCF_ID.iloc[:1]
+        picked_inds = sorted_input.loc[sorted_input.GVCF_FOLDER == gvcf_folder].GVCF_ID.iloc[:ind_cut]
         # Choose all paths based on the regions file.
         batch_name = "{}/filteredVCF/bcf_step1/{}_batch{}_fploidy2_mploidy{}.bcf"
         gvcfs_names = starting_dir+batch_name
         mask_names = starting_dir+"{}/filteredVCF/pos_bed_cov_based/{}_batch{}_fploidy2_mploidy{}.bed"
-        multihetsep_args = []
         # Workflow selecting all autosomal chromosomes above 1Mb in size.
         aut_l = region_metadata.loc[(region_metadata.FEMALE_PLOIDY == 2) &
                                     (region_metadata.MALE_PLOIDY == 2) &
@@ -175,11 +175,12 @@ for d in metadata_dirs:
                                      (region_metadata.END >= size_cutoff)][:chr_cut]
         aut_and_x = pd.concat([aut_l, x_l])
         # print(aut_and_x)
-        for c in aut_and_x.CONTIG_ID.unique():
+        for i in picked_inds:
+            multihetsep_args = []
+            for c in aut_and_x.CONTIG_ID.unique():
             # Batches are either aut/Y-linked or X-linked.
-            mploidy = aut_and_x.loc[aut_and_x.CONTIG_ID == c].MALE_PLOIDY.iloc[0]
-            b = aut_and_x.loc[aut_and_x.CONTIG_ID == c].BATCH.iloc[0]
-            for i in picked_inds:
+                mploidy = aut_and_x.loc[aut_and_x.CONTIG_ID == c].MALE_PLOIDY.iloc[0]
+                b = aut_and_x.loc[aut_and_x.CONTIG_ID == c].BATCH.iloc[0]
                 if os.path.exists(gvcfs_names.format(gvcf_folder, gvcf_folder, b, mploidy)):
                     os.makedirs(hetsep_dir+"/"+i, exist_ok=True)
                     ind_dir = {}
@@ -191,9 +192,8 @@ for d in metadata_dirs:
                     multihetsep_args.append(ind_dir)
                 else:
                     print(gvcfs_names.format(gvcf_folder, gvcf_folder, b, mploidy), "does not exist")
-        multihetsep_o = gwf.map(generate_multihetsep, multihetsep_args, name=get_ID_vcf)
-        hetsep_l = []
-        for i in picked_inds:
+            multihetsep_o = gwf.map(generate_multihetsep, multihetsep_args, name=get_ID_vcf)
+            hetsep_l, hetseps_x_l = [], []
             os.makedirs(cobraa_dir+"/"+i, exist_ok=True)
             # Aut run
             c_list = []
@@ -204,16 +204,43 @@ for d in metadata_dirs:
             hetsep_l.append({"multihetsep_l": c_list, "chrom": "aut",
                              "mem": 60})
 
-        #     x_list = []
-        #     for b in region_metadata.loc[(region_metadata.FEMALE_PLOIDY == 2) &
-        #                                  (region_metadata.MALE_PLOIDY == 1) &
-        #                                  (region_metadata.END >= 1000000)].BATCH.unique():
-        #         x_list.append("steps/multihetsep/{}/{}_batch{}.txt".format(i, i, b))
-        #     hetsep_l.append({"multihetsep_l": x_list, "bnames": "_chrX"})
-        # Unstructured
+            x_list = []
+            for c in x_l.CONTIG_ID.unique():
+                x_list.append("steps/multihetsep/{}/{}.txt".format(i, c))
+            hetseps_x_l.append({"multihetsep_l": x_list, "chrom": "chrX",
+                             "mem": 60})
+            # Unstructured aut
             gwf.map(cobraa_run_unstructured, hetsep_l,
                     name=get_ID_unstructured_cobraa)
+            # Structured aut search
             for d in hetsep_l:
+                i_l = []
+                for i in range(10, 42, 6):
+                    for j in range(4, i-4, 6):
+                        l = d.copy()
+                        l["ts"] = j
+                        l["te"] = i
+                        i_l.append(l)
+                i_structured = gwf.map(cobraa_run, i_l,
+                                       name=get_ID_structured_cobraa)
+            
+                # Pick best and perform cobraa-path.
+                # Decode can only take one file, so iterate through the various contigs
+                decode_l = []
+                for hs in d["multihetsep_l"]:
+                    decode_d = {}
+                    decode_d["param_l"] = i_structured.outputs
+                    decode_d["chrom"] = d["chrom"]
+                    decode_d["multihetsep"] = hs
+                    decode_l.append(decode_d)
+                gwf.map(cobraa_decode, decode_l,
+                name=get_ID_decode_cobraa)
+
+            # Unstructured X
+            gwf.map(cobraa_run_unstructured, hetseps_x_l,
+                    name=get_ID_unstructured_cobraa)
+            # Structured X search
+            for d in hetseps_x_l:
                 i_l = []
                 for i in range(10, 42, 6):
                     for j in range(4, i-4, 6):
