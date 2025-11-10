@@ -41,13 +41,13 @@ def generate_multihetsep(refname, vcf, contig, mask, callability):
     return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
 
 
-def cobraa_run(multihetsep_l, ts, te, chrom, mem=30):
+def cobraa_run(multihetsep_l, ts, te, chrom, mem=60):
     refname = multihetsep_l[0].split("/")[-2]
     out_path = "steps/cobraa/"+refname+"/"+chrom+"_D50_ts{}_te{}_".format(ts, te)
     inputs = multihetsep_l
     outputs = out_path+"final_parameters.txt"
     options = {
-        "cores": 3,
+        "cores": 6,
         "memory": "{}g".format(mem),
         "walltime": "12:00:00",
         "account": "baboondiversity"
@@ -59,13 +59,13 @@ def cobraa_run(multihetsep_l, ts, te, chrom, mem=30):
     return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
 
 
-def cobraa_run_unstructured(multihetsep_l, chrom, mem=30):
+def cobraa_run_unstructured(multihetsep_l, chrom, mem=60):
     refname = multihetsep_l[0].split("/")[-2]
     out_path = "steps/cobraa/"+refname+"/"+chrom+"_"
     inputs = multihetsep_l
     outputs = out_path+"final_parameters.txt"
     options = {
-        "cores": 3,
+        "cores": 6,
         "memory": "{}g".format(mem),
         "walltime": "12:00:00",
         "account": "baboondiversity"
@@ -77,7 +77,7 @@ def cobraa_run_unstructured(multihetsep_l, chrom, mem=30):
     return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
 
 
-def cobraa_decode(param_l, multihetsep, chrom, mem=60):
+def cobraa_decode(param_l, multihetsep, chrom, mem=30):
     refname = multihetsep.split("/")[-2]
     chr_name =multihetsep.split("/")[-1][:-4]
     out_path = "steps/cobraa/"+refname+"/"+chrom+"_"+chr_name+"_decode.txt"
@@ -85,7 +85,7 @@ def cobraa_decode(param_l, multihetsep, chrom, mem=60):
     outputs = out_path
     joined_params = " ".join(param_l)
     options = {
-        "cores": 3,
+        "cores": 4,
         "memory": "{}g".format(mem),
         "walltime": "12:00:00",
         "account": "baboondiversity"
@@ -132,12 +132,13 @@ metadata_dirs = glob.glob(metadata_dir+"*_individuals.txt")
 
 metadata_dirs = ['/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024_metadata/Gorilla_individuals.txt',
                  '/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024_metadata/Papio_individuals.txt',
-                 '/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024_metadata/Cercopithecus_individuals.txt']
+                 '/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024_metadata/Cercopithecus_individuals.txt',
+                 '/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024_metadata/Macaca_individuals.txt']
 
-chr_cut = 2
-ind_cut = 2
+chr_cut = 30
+ind_cut = 1
 
-for d in metadata_dirs:
+for d in metadata_dirs[:2]:
     # Identify IDs
     dir_metadata = pd.read_csv(d, sep="\t")
     dir_metadata["gss"] = dir_metadata.GENUS+"_"+dir_metadata.SPECIES+"_"+dir_metadata.SUBSPECIES
@@ -158,7 +159,7 @@ for d in metadata_dirs:
     region_metadata = pd.read_csv(metadata_dir+short_species+"_regions_and_batches.txt",
                            sep="\t")
     # Go through every unique genotype calling set.
-    for gvcf_folder in sorted_input.GVCF_FOLDER.unique()[:6]:
+    for gvcf_folder in sorted_input.GVCF_FOLDER.unique()[:2]:
         print("Using", gvcf_folder)
         # Pick the (currently one) best individuals in the metadata.
         picked_inds = sorted_input.loc[sorted_input.GVCF_FOLDER == gvcf_folder].GVCF_ID.iloc[:ind_cut]
@@ -202,7 +203,7 @@ for d in metadata_dirs:
                 # hetsep_l.append({"multihetsep_l": ["steps/multihetsep/{}/{}.txt".format(i, c)],
                 # "chrom": c})
             hetsep_l.append({"multihetsep_l": c_list, "chrom": "aut",
-                             "mem": 60})
+                             "mem": 180})
 
             x_list = []
             for c in x_l.CONTIG_ID.unique():
@@ -224,44 +225,44 @@ for d in metadata_dirs:
                 i_structured = gwf.map(cobraa_run, i_l,
                                        name=get_ID_structured_cobraa)
             
-                # Pick best and perform cobraa-path.
-                # Decode can only take one file, so iterate through the various contigs
-                decode_l = []
-                for hs in d["multihetsep_l"]:
-                    decode_d = {}
-                    decode_d["param_l"] = i_structured.outputs
-                    decode_d["chrom"] = d["chrom"]
-                    decode_d["multihetsep"] = hs
-                    decode_l.append(decode_d)
-                gwf.map(cobraa_decode, decode_l,
-                name=get_ID_decode_cobraa)
+                # # Pick best and perform cobraa-path.
+                # # Decode can only take one file, so iterate through the various contigs
+                # decode_l = []
+                # for hs in d["multihetsep_l"]:
+                #     decode_d = {}
+                #     decode_d["param_l"] = i_structured.outputs
+                #     decode_d["chrom"] = d["chrom"]
+                #     decode_d["multihetsep"] = hs
+                #     decode_l.append(decode_d)
+                # gwf.map(cobraa_decode, decode_l,
+                # name=get_ID_decode_cobraa)
 
-            # Unstructured X
-            gwf.map(cobraa_run_unstructured, hetseps_x_l,
-                    name=get_ID_unstructured_cobraa)
-            # Structured X search
-            for d in hetseps_x_l:
-                i_l = []
-                for i in range(10, 42, 6):
-                    for j in range(4, i-4, 6):
-                        l = d.copy()
-                        l["ts"] = j
-                        l["te"] = i
-                        i_l.append(l)
-                i_structured = gwf.map(cobraa_run, i_l,
-                                       name=get_ID_structured_cobraa)
+            # # Unstructured X
+            # gwf.map(cobraa_run_unstructured, hetseps_x_l,
+            #         name=get_ID_unstructured_cobraa)
+            # # Structured X search
+            # for d in hetseps_x_l:
+            #     i_l = []
+            #     for i in range(10, 42, 6):
+            #         for j in range(4, i-4, 6):
+            #             l = d.copy()
+            #             l["ts"] = j
+            #             l["te"] = i
+            #             i_l.append(l)
+            #     i_structured = gwf.map(cobraa_run, i_l,
+            #                            name=get_ID_structured_cobraa)
             
-                # Pick best and perform cobraa-path.
-                # Decode can only take one file, so iterate through the various contigs
-                decode_l = []
-                for hs in d["multihetsep_l"]:
-                    decode_d = {}
-                    decode_d["param_l"] = i_structured.outputs
-                    decode_d["chrom"] = d["chrom"]
-                    decode_d["multihetsep"] = hs
-                    decode_l.append(decode_d)
-                gwf.map(cobraa_decode, decode_l,
-                name=get_ID_decode_cobraa)
+            #     # Pick best and perform cobraa-path.
+            #     # Decode can only take one file, so iterate through the various contigs
+            #     decode_l = []
+            #     for hs in d["multihetsep_l"]:
+            #         decode_d = {}
+            #         decode_d["param_l"] = i_structured.outputs
+            #         decode_d["chrom"] = d["chrom"]
+            #         decode_d["multihetsep"] = hs
+            #         decode_l.append(decode_d)
+            #     gwf.map(cobraa_decode, decode_l,
+            #     name=get_ID_decode_cobraa)
 
 
 # # Test of the old baboondiversity to compare.
