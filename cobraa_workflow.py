@@ -130,15 +130,11 @@ os.makedirs(cobraa_dir, exist_ok=True)
 
 metadata_dirs = glob.glob(metadata_dir+"*_individuals.txt")
 
-metadata_dirs = ['/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024_metadata/Gorilla_individuals.txt',
-                 '/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024_metadata/Papio_individuals.txt',
-                 '/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024_metadata/Cercopithecus_individuals.txt',
-                 '/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024_metadata/Macaca_individuals.txt']
+chr_cut = 50
+ind_cut = 2
+decode_cut = 1
 
-chr_cut = 30
-ind_cut = 1
-
-for d in metadata_dirs[:2]:
+for d in metadata_dirs[:20]:
     # Identify IDs
     dir_metadata = pd.read_csv(d, sep="\t")
     dir_metadata["gss"] = dir_metadata.GENUS+"_"+dir_metadata.SPECIES+"_"+dir_metadata.SUBSPECIES
@@ -157,9 +153,9 @@ for d in metadata_dirs[:2]:
         print("No usable ind for", short_species)
         continue
     region_metadata = pd.read_csv(metadata_dir+short_species+"_regions_and_batches.txt",
-                           sep="\t")
+                           sep="\t").sort_values(by="END")
     # Go through every unique genotype calling set.
-    for gvcf_folder in sorted_input.GVCF_FOLDER.unique()[:2]:
+    for gvcf_folder in sorted_input.GVCF_FOLDER.unique()[:3]:
         print("Using", gvcf_folder)
         # Pick the (currently one) best individuals in the metadata.
         picked_inds = sorted_input.loc[sorted_input.GVCF_FOLDER == gvcf_folder].GVCF_ID.iloc[:ind_cut]
@@ -225,17 +221,17 @@ for d in metadata_dirs[:2]:
                 i_structured = gwf.map(cobraa_run, i_l,
                                        name=get_ID_structured_cobraa)
             
-                # # Pick best and perform cobraa-path.
-                # # Decode can only take one file, so iterate through the various contigs
-                # decode_l = []
-                # for hs in d["multihetsep_l"]:
-                #     decode_d = {}
-                #     decode_d["param_l"] = i_structured.outputs
-                #     decode_d["chrom"] = d["chrom"]
-                #     decode_d["multihetsep"] = hs
-                #     decode_l.append(decode_d)
-                # gwf.map(cobraa_decode, decode_l,
-                # name=get_ID_decode_cobraa)
+                # Pick best and perform cobraa-path.
+                # Decode can only take one file, so iterate through the various contigs
+                decode_l = []
+                for hs in d["multihetsep_l"][:decode_cut]:
+                    decode_d = {}
+                    decode_d["param_l"] = i_structured.outputs
+                    decode_d["chrom"] = d["chrom"]
+                    decode_d["multihetsep"] = hs
+                    decode_l.append(decode_d)
+                gwf.map(cobraa_decode, decode_l,
+                name=get_ID_decode_cobraa)
 
             # # Unstructured X
             # gwf.map(cobraa_run_unstructured, hetseps_x_l,
