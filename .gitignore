@@ -147,4 +147,4 @@ data/*/*
 picard/
 chain_files/
 cobraa/
-zarr_data/
+zarr_*
