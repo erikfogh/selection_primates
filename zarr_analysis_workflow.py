@@ -25,7 +25,7 @@ def analyse_zarr_het_hom(zarr_dir, metadata, window_size, out_path):
     spec = """
     python scripts/zarr_analysis_het_hom.py -i {zarr_dir} -m {metadata} -w {window_size} -o {out_path}
     """.format(zarr_dir=zarr_dir, metadata=metadata, window_size=window_size, out_path=out_path)
-    print(outputs, spec)
+    # print(outputs, spec)
     return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
 
 
@@ -37,7 +37,7 @@ def get_ID_analyse_het(idx, target):
 # Do all analysis in one python script.
 
 map_input = []
-for x in glob.glob(zarr_path+"*")[:5]:
+for x in glob.glob(zarr_path+"*")[:10]:
     d = {}
     d["zarr_dir"] = x
     d["metadata"] = metadata_path

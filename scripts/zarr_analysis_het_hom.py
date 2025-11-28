@@ -141,7 +141,7 @@ for c in glob.glob(zarr_path+"/*/"):
         df_sub = pd.DataFrame({"het": ds.stat_diversity[:,i], "alt_hom": ds.alt_hom[:,i],
         "variant_count": ds.window_stop-ds.window_start, "GVCF_ID": ds.sample_id[i].values})
         df_sub["window_start"] = list(range(0, len(ds.window_start)*window_size, window_size))
-        df_sub["chrom"] = c.split("/")[-1]
+        df_sub["chrom"] = c.split("/")[-2]
         df_l.append(df_sub)
 df_het = pd.concat(df_l)
 bed_files = read_beds(long_form)

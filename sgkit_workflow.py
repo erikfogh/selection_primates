@@ -58,7 +58,7 @@ sub_vasili = vasili_table.loc[(vasili_table.finalQC != "fail")
                              ]
 
 
-for species in sub_vasili.species_genotyping.unique()[:10]:
+for species in sub_vasili.species_genotyping.unique()[:100]:
     species_inds = sub_vasili.loc[sub_vasili.species_genotyping == species]
     short_form = species.split("_")[0]
     regions_df = pd.read_csv(metadata_path+"{}_regions_and_batches.txt".format(short_form), sep="\t")
