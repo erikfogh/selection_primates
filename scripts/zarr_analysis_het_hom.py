@@ -29,12 +29,13 @@ parser.add_argument('-o', help='outpath', type=str)
 args = parser.parse_args()
 
 window_size = args.w*1000
+bed_base = "/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024/"
 
 # Functions
 
 def read_beds(long_form):
-    bed_path_x = "/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024/{}/filteredVCF/pos_bed_cov_based/{}_batch*_fploidy2_mploidy1.bed".format(long_form, long_form)
-    bed_path_all = "/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024/{}/filteredVCF/pos_bed_cov_based/{}_batch*_fploidy2_mploidy2.bed".format(long_form, long_form)
+    bed_path_x = bed_base+"{}/filteredVCF/all_samples/pos_bed_cov_based/{}_batch*_fploidy2_mploidy1.bed".format(long_form, long_form)
+    bed_path_all = bed_base+"{}/filteredVCF/all_samples/pos_bed_cov_based/{}_batch*_fploidy2_mploidy2.bed".format(long_form, long_form)
     bed_l = []
     for b in glob.glob(bed_path_all):
         bed_file = pd.read_csv(b, sep="\t", names=["chrom", "start", "end"])

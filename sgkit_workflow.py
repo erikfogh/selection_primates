@@ -57,9 +57,22 @@ sub_vasili = vasili_table.loc[(vasili_table.finalQC != "fail")
                               & (~vasili_table.ID.str.startswith("SAMEA11633"))
                              ]
 
+failed_species = ['Saimiri_macrodon_ssp',
+ 'Macaca_thibetana_ssp',
+ 'Saimiri_sciureus_ssp',
+ 'Saimiri_oerstedii_ssp',
+ 'Saimiri_ustus_ssp',
+ 'Macaca_arctoides_ssp',
+ 'Macaca_leucogenys_ssp',
+ 'Macaca_assamensis_ssp',
+ 'Macaca_radiata_ssp',
+ 'Saimiri_cassiquiarensis_ssp',
+ 'Saimiri_boliviensis_ssp']
 
-for species in sub_vasili.species_genotyping.unique()[175:]:
+
+for species in failed_species[:]:
     species_inds = sub_vasili.loc[sub_vasili.species_genotyping == species]
+    print(species, species_inds)
     short_form = species.split("_")[0]
     regions_df = pd.read_csv(metadata_path+"{}_regions_and_batches.txt".format(short_form), sep="\t")
     reference = species_inds["reference"].unique()

@@ -37,7 +37,7 @@ def get_ID_analyse_het(idx, target):
 # Do all analysis in one python script.
 
 map_input = []
-for x in glob.glob(zarr_path+"*")[:10]:
+for x in glob.glob(zarr_path+"*")[:]:
     d = {}
     d["zarr_dir"] = x
     d["metadata"] = metadata_path
