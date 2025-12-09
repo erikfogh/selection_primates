@@ -70,9 +70,8 @@ failed_species = ['Saimiri_macrodon_ssp',
  'Saimiri_boliviensis_ssp']
 
 
-for species in failed_species[:]:
+for species in sub_vasili.species_genotyping.unique()[:]:
     species_inds = sub_vasili.loc[sub_vasili.species_genotyping == species]
-    print(species, species_inds)
     short_form = species.split("_")[0]
     regions_df = pd.read_csv(metadata_path+"{}_regions_and_batches.txt".format(short_form), sep="\t")
     reference = species_inds["reference"].unique()
@@ -89,13 +88,13 @@ for species in failed_species[:]:
     zarr_input.extend(regions_df.loc[(regions_df.END >= 1000000) &
                                   (regions_df.FEMALE_PLOIDY == 2) &
                                   (regions_df.MALE_PLOIDY == 1) &
-          (regions_df.REFERENCE_FOLDER == reference[0]+"_ssp")].CONTIG_ID.unique()[:])
+          (regions_df.REFERENCE_FOLDER.str.startswith(reference[0]))].CONTIG_ID.unique()[:])
     # Autosomes
     zarr_input.extend(regions_df.loc[(regions_df.END >= 1000000) &
                                   (regions_df.FEMALE_PLOIDY == 2) &
                                   (regions_df.MALE_PLOIDY == 2) &
                                   (~regions_df.CONTIG_ID.isin((zarr_input))) &
-          (regions_df.REFERENCE_FOLDER == reference[0]+"_ssp")].CONTIG_ID.unique()[:])
+          (regions_df.REFERENCE_FOLDER.str.startswith(reference[0]))].CONTIG_ID.unique()[:])
     out_path = zarr_dir+species+"/"
     os.makedirs(out_path, exist_ok=True)
     gwf.map(generate_zarr, zarr_input, name=get_ID_vcf,
