@@ -9,16 +9,16 @@ gwf = Workflow()
 zarr_path = "zarr_20x_inds/"
 metadata_path = "/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024_metadata/"
 out_path = "results/window_stats_20x_inds/"
-window_size = 10 # In kb
+window_size = 100 # In kb
 
 
 def analyse_zarr_het_hom(zarr_dir, metadata, window_size, out_path):
     inputs = [zarr_dir]
-    long_form = zarr_dir.split("/")[-1]
+    long_form = zarr_dir.split("/")[-2]
     outputs = ["{}{}_{}kb_het_hom.txt".format(out_path, long_form, window_size)]
     options = {
         "cores": 4,
-        "memory": "30g",
+        "memory": "32g",
         "walltime": "60:00:00",
         "account": "baboondiversity"
     }
@@ -39,7 +39,7 @@ def get_ID_analyse_het(idx, target):
 map_input = []
 for x in glob.glob(zarr_path+"*")[:]:
     d = {}
-    d["zarr_dir"] = x
+    d["zarr_dir"] = x+"/zarr"
     d["metadata"] = metadata_path
     d["window_size"] = window_size
     d["out_path"] = out_path

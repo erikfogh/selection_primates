@@ -11,24 +11,36 @@ metadata_path = "/home/eriks/primatediversity/data/gVCFs_recalling_10_12_2024_me
 zarr_dir = "zarr_20x_inds/"
 vasili_stats = "~/primatediversity/data/gVCFs_recalling_10_12_2024_metadata/plots/SupTable_Sample_Stats_wGT_QC.tsv"
 
-def generate_zarr(focus_chr, sample_names, all_chr, out_path):
+def generate_zarr(chr_list, sample_names, all_chr, out_path):
     inputs = [all_chr]
-    o = out_path+focus_chr+"/call_genotype"
+    o = out_path+"/zarr/call_genotype"
     outputs = [o]
+    sample_count = len(sample_names.split(","))+1
+    if sample_count <= 10:
+        chunk_size = 1000000
+        mem_res = 48
+        time_res = 12
+    else:
+        chunk_size = 100000
+        mem_res = 64
+        time_res = 120
     options = {
         "cores": 4,
-        "memory": "30g",
-        "walltime": "12:00:00",
+        "memory": "{}g".format(mem_res),
+        "walltime": "{}:00:00".format(time_res),
         "account": "baboondiversity"
     }
     spec = """
-    bcftools view -Ou -s {sample_names} -r {focus_chr} {all_chr} > {temp_bcf}
+    bcftools view -Ou -s {sample_names} -r {chr_list} {all_chr} > {temp_bcf}
     bcftools index {temp_bcf}
-    vcf2zarr convert {temp_bcf} {out_path}
+    vcf2zarr explode -c 1000 {temp_bcf} {out_path}temp.icf
+    vcf2zarr encode -l {chunk_size} -w {sample_count} {out_path}temp.icf {out_path}/zarr
+    rm {out_path}temp.icf -r
     rm {temp_bcf}
     rm {temp_bcf}.csi
-    """.format(sample_names=sample_names, focus_chr=focus_chr, all_chr=all_chr,
-               temp_bcf=out_path+focus_chr+"_temp.bcf", out_path=out_path+focus_chr)
+    """.format(sample_names=sample_names, chr_list=chr_list, all_chr=all_chr,
+               temp_bcf=out_path+"temp.bcf", out_path=out_path,
+               chunk_size=chunk_size, sample_count=sample_count)
     # print(spec)
     return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
 
@@ -38,11 +50,14 @@ def generate_zarr(focus_chr, sample_names, all_chr, out_path):
 #     fi
 #     rm {temp_bcf}
 #     rm {temp_bcf}.csi
+#     vcf2zarr convert -l {chunk_size} {temp_bcf} {out_path}
+
+
 
 
 def get_ID_vcf(idx, target):
     #print(target.spec)
-    filename = target.spec.split("/")[-2].split(".")[0]+"_"+target.spec.split("/")[-1].split("_temp")[0]
+    filename = target.spec.split("/")[-2].split(".")[0]
     return 'vcf_zarr_{}'.format(filename)
 
 
@@ -57,25 +72,13 @@ sub_vasili = vasili_table.loc[(vasili_table.finalQC != "fail")
                               & (~vasili_table.ID.str.startswith("SAMEA11633"))
                              ]
 
-failed_species = ['Saimiri_macrodon_ssp',
- 'Macaca_thibetana_ssp',
- 'Saimiri_sciureus_ssp',
- 'Saimiri_oerstedii_ssp',
- 'Saimiri_ustus_ssp',
- 'Macaca_arctoides_ssp',
- 'Macaca_leucogenys_ssp',
- 'Macaca_assamensis_ssp',
- 'Macaca_radiata_ssp',
- 'Saimiri_cassiquiarensis_ssp',
- 'Saimiri_boliviensis_ssp']
-
-
 for species in sub_vasili.species_genotyping.unique()[:]:
     species_inds = sub_vasili.loc[sub_vasili.species_genotyping == species]
     short_form = species.split("_")[0]
     regions_df = pd.read_csv(metadata_path+"{}_regions_and_batches.txt".format(short_form), sep="\t")
     reference = species_inds["reference"].unique()
     sample_names = ",".join(species_inds["ID"])
+    # print(len(species_inds["ID"]), species)
     all_chr_file = starting_dir.format(species)+species+"_all_chr.sorted.bcf"
     if not os.path.exists(all_chr_file):
         print("Filtered VCF does not exist ", species)
@@ -88,16 +91,16 @@ for species in sub_vasili.species_genotyping.unique()[:]:
     zarr_input.extend(regions_df.loc[(regions_df.END >= 1000000) &
                                   (regions_df.FEMALE_PLOIDY == 2) &
                                   (regions_df.MALE_PLOIDY == 1) &
-          (regions_df.REFERENCE_FOLDER.str.startswith(reference[0]))].CONTIG_ID.unique()[:])
+          (regions_df.REFERENCE_FOLDER.str.startswith(reference[0]))].CONTIG_ID.unique())
     # Autosomes
     zarr_input.extend(regions_df.loc[(regions_df.END >= 1000000) &
                                   (regions_df.FEMALE_PLOIDY == 2) &
                                   (regions_df.MALE_PLOIDY == 2) &
                                   (~regions_df.CONTIG_ID.isin((zarr_input))) &
-          (regions_df.REFERENCE_FOLDER.str.startswith(reference[0]))].CONTIG_ID.unique()[:])
+          (regions_df.REFERENCE_FOLDER.str.startswith(reference[0]))].CONTIG_ID.unique())
     out_path = zarr_dir+species+"/"
     os.makedirs(out_path, exist_ok=True)
-    gwf.map(generate_zarr, zarr_input, name=get_ID_vcf,
+    gwf.map(generate_zarr, [",".join(zarr_input)], name=get_ID_vcf,
             extra={"all_chr": all_chr_file, "sample_names": sample_names, "out_path": out_path})
         # # Chromosome Y needs a different input file as it isn't part of the filteredVCF input.
         # I'm shuttering it for now - need at the very least bed files and PAR identification to be useful

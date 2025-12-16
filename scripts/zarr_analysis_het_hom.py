@@ -106,8 +106,8 @@ def alt_hom(ds):
 
 print("Loading metadata")
 zarr_path = args.i
-short_form = zarr_path.split("/")[-1].split("_")[0]
-long_form = zarr_path.split("/")[-1]
+short_form = zarr_path.split("/")[-2].split("_")[0]
+long_form = zarr_path.split("/")[-2]
 # Loading the various metadata files. Metadata, contig information, callability bed.
 metadata_path = args.m
 metadata_df = pd.read_csv(metadata_path+"{}_individuals.txt".format(short_form), sep="\t")
@@ -123,11 +123,16 @@ bed_files = read_beds(long_form)
 # Loading the genetic data.
 print("Loading genetic data")
 df_l = []
-for c in glob.glob(zarr_path+"/*/"):
+ds_full = sg.load_dataset(zarr_path)
+kept_contigs =  [x for x in ds_full.contig_id.values if (x == large_contigs).any()]
+contig_IDs = pd.Series(kept_contigs).map(dict(zip(ds_full.contig_id.values, range(len(ds_full.contig_id.values))))).values
+
+for c, c_ID in zip(kept_contigs, contig_IDs):
     print(c)
-    ds = sg.load_dataset(c[:-1])
-    if len(ds.variants) < 10:
+    ds = ds_full.sel(variants=((ds_full.variant_contig == c_ID).compute()))
+    if len(ds.variants) < 1000:
         print("Skipping due to too few variants")
+        continue
     var_chunk = min(50, 1+len(ds.variants)//1000000)
     print(len(ds.variants), var_chunk)
     ds["sample_cohort"] = ds["samples"]
@@ -142,7 +147,7 @@ for c in glob.glob(zarr_path+"/*/"):
         df_sub = pd.DataFrame({"het": ds.stat_diversity[:,i], "alt_hom": ds.alt_hom[:,i],
         "variant_count": ds.window_stop-ds.window_start, "GVCF_ID": ds.sample_id[i].values})
         df_sub["window_start"] = list(range(0, len(ds.window_start)*window_size, window_size))
-        df_sub["chrom"] = c.split("/")[-2]
+        df_sub["chrom"] = c
         df_l.append(df_sub)
 df_het = pd.concat(df_l)
 bed_files = read_beds(long_form)
