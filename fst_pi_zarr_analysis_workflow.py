@@ -18,9 +18,9 @@ def analyse_zarr_fst_pi(zarr_dir, metadata, window_size, fst_cutoff, out_path):
     long_form = zarr_dir.split("/")[-2]
     outputs = ["{}{}_{}kb_pi_fst{}.txt".format(out_path, long_form, window_size, fst_cutoff)]
     options = {
-        "cores": 2,
-        "memory": "16g",
-        "walltime": "60:00:00",
+        "cores": 3,
+        "memory": "32g",
+        "walltime": "12:00:00",
         "account": "baboondiversity"
     }
     spec = """
