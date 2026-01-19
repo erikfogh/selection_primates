@@ -18,8 +18,8 @@ def analyse_zarr_fst_pi(zarr_dir, metadata, window_size, fst_cutoff, out_path):
     long_form = zarr_dir.split("/")[-2]
     outputs = ["{}{}_{}kb_pi_fst{}.txt".format(out_path, long_form, window_size, fst_cutoff)]
     options = {
-        "cores": 3,
-        "memory": "32g",
+        "cores": 13,
+        "memory": "132g",
         "walltime": "12:00:00",
         "account": "baboondiversity"
     }
@@ -39,7 +39,7 @@ def get_ID_analyse_het(idx, target):
 # Do all analysis in one python script.
 
 map_input = []
-for x in glob.glob(zarr_path+"*")[:5]:
+for x in glob.glob(zarr_path+"*")[:]:
     d = {}
     d["zarr_dir"] = x+"/zarr"
     d["metadata"] = metadata_path

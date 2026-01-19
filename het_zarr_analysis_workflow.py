@@ -18,7 +18,7 @@ def analyse_zarr_het_hom(zarr_dir, metadata, window_size, out_path):
     outputs = ["{}{}_{}kb_het_hom.txt".format(out_path, long_form, window_size)]
     options = {
         "cores": 4,
-        "memory": "32g",
+        "memory": "80g",
         "walltime": "60:00:00",
         "account": "baboondiversity"
     }

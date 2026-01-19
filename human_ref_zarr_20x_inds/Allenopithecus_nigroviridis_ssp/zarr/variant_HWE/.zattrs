@@ -1,0 +1,7 @@
+{
+    "_ARRAY_DIMENSIONS": [
+        "variants",
+        "alt_alleles"
+    ],
+    "description": "HWE test (PMID:15789306); 1=good, 0=bad"
+}
