@@ -1,8 +1,0 @@
-{
-    "_ARRAY_DIMENSIONS": [
-        "variants",
-        "samples",
-        "alt_alleles"
-    ],
-    "description": "The fraction of reads with alternate allele (nALT/nSumAll)"
-}

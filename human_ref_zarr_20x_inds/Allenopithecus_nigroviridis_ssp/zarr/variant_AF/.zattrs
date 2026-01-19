@@ -1,7 +1,0 @@
-{
-    "_ARRAY_DIMENSIONS": [
-        "variants",
-        "alt_alleles"
-    ],
-    "description": "Allele Frequency, for each ALT allele, in the same order as listed"
-}

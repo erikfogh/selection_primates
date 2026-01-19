@@ -1,7 +1,0 @@
-{
-    "_ARRAY_DIMENSIONS": [
-        "variants",
-        "alt_alleles"
-    ],
-    "description": "Test excess heterozygosity; 1=good, 0=bad"
-}

@@ -1,6 +1,0 @@
-{
-    "_ARRAY_DIMENSIONS": [
-        "variants"
-    ],
-    "description": "The REF and the ALT alleles have been reverse complemented in liftover since the mapping from the previous reference to the current one was on the negative strand."
-}

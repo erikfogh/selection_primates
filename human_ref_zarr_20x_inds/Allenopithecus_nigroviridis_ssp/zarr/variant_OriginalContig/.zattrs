@@ -1,6 +1,0 @@
-{
-    "_ARRAY_DIMENSIONS": [
-        "variants"
-    ],
-    "description": "The name of the source contig/chromosome prior to liftover."
-}
