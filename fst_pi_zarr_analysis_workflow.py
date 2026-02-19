@@ -12,7 +12,24 @@ out_path = "results/window_stats_20x_inds/"
 window_size = 100 # In kb
 fst_cutoff = 0.1
 
+def analyse_zarr_pi(zarr_dir, metadata, window_size, out_path):
+    inputs = [zarr_dir]
+    long_form = zarr_dir.split("/")[-2]
+    outputs = ["{}{}_{}kb_pi.txt".format(out_path, long_form, window_size)]
+    options = {
+        "cores": 4,
+        "memory": "28g",
+        "walltime": "12:00:00",
+        "account": "baboondiversity"
+    }
+    spec = """
+    python scripts/zarr_analysis_pi.py -i {zarr_dir} -m {metadata} -w {window_size} -o {out_path}
+    """.format(zarr_dir=zarr_dir, metadata=metadata, window_size=window_size,out_path=out_path)
+    # print(outputs, spec)
+    return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
 
+
+# This is an old version, but I might use it later for pi estimates based on sub-pops.
 def analyse_zarr_fst_pi(zarr_dir, metadata, window_size, fst_cutoff, out_path):
     inputs = [zarr_dir]
     long_form = zarr_dir.split("/")[-2]
@@ -44,7 +61,6 @@ for x in glob.glob(zarr_path+"*")[:]:
     d["zarr_dir"] = x+"/zarr"
     d["metadata"] = metadata_path
     d["window_size"] = window_size
-    d["fst_cutoff"] = fst_cutoff
     d["out_path"] = out_path
     map_input.append(d)
-gwf.map(analyse_zarr_fst_pi, map_input, name=get_ID_analyse_het)
+gwf.map(analyse_zarr_pi, map_input, name=get_ID_analyse_het)

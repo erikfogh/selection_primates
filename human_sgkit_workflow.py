@@ -18,12 +18,12 @@ def generate_zarr(all_chr, sample_names, out_path):
     sample_count = len(sample_names.split(","))+1
     if sample_count <= 10:
         chunk_size = 1000000
-        mem_res = 48
+        mem_res = 32
         time_res = 12
     else:
         chunk_size = 100000
-        mem_res = 64
-        time_res = 120
+        mem_res = 56
+        time_res = 24
     options = {
         "cores": 4,
         "memory": "{}g".format(mem_res),
@@ -31,17 +31,45 @@ def generate_zarr(all_chr, sample_names, out_path):
         "account": "baboondiversity"
     }
     spec = """
-    bcftools view -Ou -s {sample_names} -m2 -M2 {all_chr} > {temp_bcf}
+    bcftools view -Ou -s {sample_names} --force-samples -m2 {all_chr} | bcftools annotate -x INFO,^FORMAT/GT,FORMAT/PL -Ob -o {temp_bcf}
     bcftools index {temp_bcf}
+    bcftools query -f{bed_filter} {all_chr} | bedtools merge -d 1 > {out_path}.bed
     vcf2zarr explode -c 1000 {temp_bcf} {out_path}temp.icf
-    vcf2zarr encode -l {chunk_size} -w {sample_count} {out_path}temp.icf {out_path}
+    vcf2zarr encode -l {chunk_size} -w {sample_count} {out_path}temp.icf -M {mem}G {out_path}
     rm {out_path}temp.icf -r
     rm {temp_bcf}
     rm {temp_bcf}.csi
     """.format(sample_names=sample_names, all_chr=all_chr,
+               bed_filter = "'%CHROM\t%POS0\t%END\t%ID\n'",
                temp_bcf=out_path+"temp.bcf", out_path=out_path,
-               chunk_size=chunk_size, sample_count=sample_count)
-    print(spec)
+               chunk_size=chunk_size, sample_count=sample_count,
+               mem=mem_res-4)
+    # print(spec)
+    return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
+
+
+def generate_bed(all_chr, sample_names, out_path):
+    inputs = [all_chr]
+    o = out_path+".bed"
+    outputs = [o]
+    sample_count = len(sample_names.split(","))+1
+    if sample_count <= 10:
+        mem_res = 8
+        time_res = 12
+    else:
+        mem_res = 16
+        time_res = 24
+    options = {
+        "cores": 1,
+        "memory": "{}g".format(mem_res),
+        "walltime": "{}:00:00".format(time_res),
+        "account": "baboondiversity"
+    }
+    spec = """
+    bcftools query -f{bed_filter} {all_chr} | bedtools merge -d 1 > {out_path}.bed
+    """.format(all_chr=all_chr,
+               bed_filter = "'%CHROM\t%POS0\t%END\t%ID\n'", out_path=out_path)
+    # print(spec)
     return AnonymousTarget(inputs=inputs, outputs=outputs, options=options, spec=spec)
 
 #  b_count=$(bcftools +counts {temp_bcf} | sed -n '2p' | grep -o -E '[0-9]+')
@@ -66,28 +94,44 @@ def get_ID_vcf_x(idx, target):
     return 'vcf_zarr_{}'.format(filename)
 
 
+def get_ID_bed(idx, target):
+    #print(target.spec)
+    filename = target.spec.split("/")[-2].split(".")[0]
+    return 'vcf_bed_{}'.format(filename)
+
+def get_ID_bed_x(idx, target):
+    #print(target.spec)
+    filename = target.spec.split("/")[-2].split(".")[0]+"_chrX"
+    return 'vcf_bed_{}'.format(filename)
+
+
 # This section goes through all metadata folders and identifies the corresponding VCFs to use.
 
 # metadata_folders = glob.glob(metadata_path+"*_individuals.txt")
-vasili_table = pd.read_csv(vasili_stats, sep="\t")
-sub_vasili = vasili_table.loc[(vasili_table.finalQC != "fail")
-                              & (vasili_table.cov_chrA >= 20)
-                              & (vasili_table.remove_as_relative != True)
-                              & (vasili_table.remove_manual != True)
-                              & (~vasili_table.ID.str.startswith("SAMEA11633"))
+metadata_table = pd.read_csv(vasili_stats, sep="\t")
+metadata_20x_filt = metadata_table.loc[(metadata_table.finalQC != "fail")
+                              & (metadata_table.cov_chrA >= 20)
+                              & (metadata_table.remove_as_relative != True)
+                              & (metadata_table.remove_manual != True)
+                              & (~metadata_table.ID.str.startswith("SAMEA11633"))
+                              & (metadata_table.species == "gorilla")
                              ]
 
-for species in sub_vasili.species_genotyping.unique()[10:12]:
-    species_inds = sub_vasili.loc[sub_vasili.species_genotyping == species]
+for species in metadata_20x_filt.species_genotyping.unique()[:]:
+    species_inds = metadata_20x_filt.loc[metadata_20x_filt.species_genotyping == species]
     short_form = species.split("_")[0]
     regions_df = pd.read_csv(metadata_path+"{}_regions_and_batches.txt".format(short_form), sep="\t")
     reference = species_inds["reference"].unique()
     sample_names = ",".join(species_inds["ID"])
     # print(len(species_inds["ID"]), species)
     aut_chr_file = starting_dir.format(species)+"_all_lifted.strict.g.bcf"
+    x_chr_file = starting_dir.format(species)+"_fploidy_2_mploidy_1_all_lifted.strict.g.bcf"
     if not os.path.exists(aut_chr_file):
         print(aut_chr_file)
         print("Aut VCF does not exist ", species)
+        continue
+    if not os.path.exists(x_chr_file):
+        print("Chr X VCF does not exist ", species)
         continue
     if len(reference) > 1:
         print("Too many references ", species)
@@ -97,12 +141,12 @@ for species in sub_vasili.species_genotyping.unique()[10:12]:
     os.makedirs(out_path, exist_ok=True)
     gwf.map(generate_zarr, [aut_chr_file], name=get_ID_vcf,
             extra={"sample_names": sample_names, "out_path": out_path+"/zarr"})
+    gwf.map(generate_bed, [aut_chr_file], name=get_ID_bed,
+            extra={"sample_names": sample_names, "out_path": out_path+"/zarr"})
     # Chromosome X
-    x_chr_file = starting_dir.format(species)+"_fploidy_2_mploidy_1_all_lifted.strict.g.bcf"
-    if not os.path.exists(x_chr_file):
-        print("Chr X VCF does not exist ", species)
-        continue
     gwf.map(generate_zarr, [x_chr_file], name=get_ID_vcf_x,
+            extra={"sample_names": sample_names, "out_path": out_path+"/zarr_X"})
+    gwf.map(generate_bed, [x_chr_file], name=get_ID_bed_x,
             extra={"sample_names": sample_names, "out_path": out_path+"/zarr_X"})
         # # Chromosome Y needs a different input file as it isn't part of the filteredVCF input.
         # I'm shuttering it for now - need at the very least bed files and PAR identification to be useful
