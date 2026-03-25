@@ -114,7 +114,6 @@ metadata_20x_filt = metadata_table.loc[(metadata_table.finalQC != "fail")
                               & (metadata_table.remove_as_relative != True)
                               & (metadata_table.remove_manual != True)
                               & (~metadata_table.ID.str.startswith("SAMEA11633"))
-                              & (metadata_table.species == "gorilla")
                              ]
 
 for species in metadata_20x_filt.species_genotyping.unique()[:]:
@@ -127,8 +126,8 @@ for species in metadata_20x_filt.species_genotyping.unique()[:]:
     aut_chr_file = starting_dir.format(species)+"_all_lifted.strict.g.bcf"
     x_chr_file = starting_dir.format(species)+"_fploidy_2_mploidy_1_all_lifted.strict.g.bcf"
     if not os.path.exists(aut_chr_file):
-        print(aut_chr_file)
-        print("Aut VCF does not exist ", species)
+        # print(aut_chr_file)
+        # print("Aut VCF does not exist ", species)
         continue
     if not os.path.exists(x_chr_file):
         print("Chr X VCF does not exist ", species)

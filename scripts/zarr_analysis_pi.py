@@ -139,7 +139,7 @@ df_l = []
 for c, c_ID in zip(kept_contigs, contig_IDs):
     print(c)
     ds = ds_full.sel(variants=((ds_full.variant_contig == c_ID).compute()), contigs=[c_ID])
-    if len(ds.variants) < 100:
+    if len(ds.variants) < 1000:
         print("Skipping due to too few variants")
         continue
     # Some chunking works as too many chunks can cause problems.
@@ -167,3 +167,6 @@ output_df = pd.merge(df_pi, intervals_callable, on=["chrom", "window_start"])
 output_df["chr_type"] = output_df["chrom"].map(dict(zip(regions_df.CONTIG_ID, regions_df.chr_type)))
 output_df["species"] = long_form
 output_df.to_csv("{}{}_{}kb_pi.txt".format(args.o, long_form, args.w), sep="\t", index=False)
+output_df["feature_name"] = output_df["chr_type"]+":"+output_df["callable_frac"].astype(str)
+bed_df = output_df[["chrom", "window_start", "window_end", "feature_name", "pi"]]
+bed_df.to_csv("{}{}_{}kb_pi.bed".format(args.o, long_form, args.w), sep="\t", index=False, header=False)
