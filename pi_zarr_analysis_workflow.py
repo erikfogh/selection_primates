@@ -139,50 +139,50 @@ def get_ID_annotate_pi(idx, target):
 
 # Mapping over the different gwf workflows
 
-map_input = []
-for x in zarr_species:
-    d = {}
-    d["zarr_dir"] = x+"/zarr"
-    d["metadata"] = metadata_path
-    d["window_size"] = window_size
-    d["out_path"] = out_path
-    map_input.append(d)
-gwf.map(analyse_zarr_pi, map_input, name=get_ID_analyse_pi)
-
-map_input = []
-for x in zarr_species:
-    s = x.split("/")[-1]
-    chain_ref = metadata_20x_filt.loc[metadata_20x_filt.species_genotyping == s].reference.iloc[0]
-    d = {}
-    d["in_bed"] = "{}{}_{}kb_pi.bed".format(out_path, s, window_size)
-    d["chain_file"] = chain_path+chain_ref+"_vs_Homo_sapiens.chain.gz"
-    d["out_bed"] = "{}{}_{}kb_pi.bed".format(out_path_lift, s, window_size)
-    map_input.append(d)
-bed_lift = gwf.map(human_bed_lift, map_input, name=get_ID_analyse_bed)
-
-gwf.map(bed_annotate_window_df, bed_lift.outputs, extra={"feature_bed": feature_bed_path,
-                                            "window_size": 100},
-                                            name=get_ID_annotate_pi)
-
-
-
 # map_input = []
-# for s in used_species:
+# for x in zarr_species:
 #     d = {}
-#     d["zarr_dir"] = zarr_path+s+"/zarr"
+#     d["zarr_dir"] = x+"/zarr"
 #     d["metadata"] = metadata_path
-#     d["window_size"] = window_size_TD
-#     d["step_size"] = step_size_TD
+#     d["window_size"] = window_size
 #     d["out_path"] = out_path
 #     map_input.append(d)
-# gwf.map(analyse_zarr_Tajima_D, map_input, name=get_ID_analyse_TD)
+# gwf.map(analyse_zarr_pi, map_input, name=get_ID_analyse_pi)
 
 # map_input = []
-# for s in used_species:
+# for x in zarr_species:
+#     s = x.split("/")[-1]
 #     chain_ref = metadata_20x_filt.loc[metadata_20x_filt.species_genotyping == s].reference.iloc[0]
 #     d = {}
-#     d["in_bed"] = "{}{}_{}kb_{}step_Tajima_D.bed".format(out_path, s, window_size_TD, step_size_TD)
+#     d["in_bed"] = "{}{}_{}kb_pi.bed".format(out_path, s, window_size)
 #     d["chain_file"] = chain_path+chain_ref+"_vs_Homo_sapiens.chain.gz"
-#     d["out_bed"] = "{}{}_{}kb_{}step_Tajima_D.bed".format(out_path_lift, s, window_size_TD, step_size_TD)
+#     d["out_bed"] = "{}{}_{}kb_pi.bed".format(out_path_lift, s, window_size)
 #     map_input.append(d)
-# gwf.map(human_bed_lift, map_input, name=get_ID_analyse_bed)
+# bed_lift = gwf.map(human_bed_lift, map_input, name=get_ID_analyse_bed)
+
+# gwf.map(bed_annotate_window_df, bed_lift.outputs, extra={"feature_bed": feature_bed_path,
+#                                             "window_size": 100},
+#                                             name=get_ID_annotate_pi)
+
+
+
+map_input = []
+for s in used_species:
+    d = {}
+    d["zarr_dir"] = zarr_path+s+"/zarr"
+    d["metadata"] = metadata_path
+    d["window_size"] = window_size_TD
+    d["step_size"] = step_size_TD
+    d["out_path"] = out_path
+    map_input.append(d)
+gwf.map(analyse_zarr_Tajima_D, map_input, name=get_ID_analyse_TD)
+
+map_input = []
+for s in used_species:
+    chain_ref = metadata_20x_filt.loc[metadata_20x_filt.species_genotyping == s].reference.iloc[0]
+    d = {}
+    d["in_bed"] = "{}{}_{}kb_{}step_Tajima_D.bed".format(out_path, s, window_size_TD, step_size_TD)
+    d["chain_file"] = chain_path+chain_ref+"_vs_Homo_sapiens.chain.gz"
+    d["out_bed"] = "{}{}_{}kb_{}step_Tajima_D.bed".format(out_path_lift, s, window_size_TD, step_size_TD)
+    map_input.append(d)
+gwf.map(human_bed_lift, map_input, name=get_ID_analyse_bed)
