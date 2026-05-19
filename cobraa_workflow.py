@@ -144,16 +144,15 @@ metadata_20x_filt = metadata_table.loc[(metadata_table.finalQC != "fail")
                              ]
 
 skipped_cases = []
-for g in metadata_20x_filt.genus.unique()[:3]:
+for g in metadata_20x_filt.genus.unique()[:]:
     # Identify IDs
     species_metadata = metadata_20x_filt.loc[metadata_20x_filt.genus == g]
-    species_metadata = species_metadata.loc[species_metadata.cov_chrX >= 5]
+    #species_metadata = species_metadata.loc[species_metadata.cov_chrX >= 5]
     # I only want females as they have a diploid chrX.
     female_df = species_metadata.loc[(species_metadata.gSEX == "F")].sort_values(by="cov_chrA", ascending=False)
     # # Restricted analysis to females - below is the way to include males if you want to run non-X analysis.
-    # male_df = species_metadata.loc[~(species_metadata.ID.isin(female_df.ID))].sort_values(by="cov_chrA", ascending=False)
-    # sorted_df = pd.concat([female_df, male_df])
-    sorted_df = female_df
+    male_df = species_metadata.loc[~(species_metadata.ID.isin(female_df.ID))].sort_values(by="cov_chrA", ascending=False)
+    sorted_df = pd.concat([female_df, male_df])
     if len(sorted_df) > 0:
         sorted_input = sorted_df
     else:
@@ -164,7 +163,10 @@ for g in metadata_20x_filt.genus.unique()[:3]:
     # Go through every unique genotype calling set.
     for gvcf_folder in sorted_input.species_genotyping.unique()[:]:
         # Pick the (currently one) best individuals in the metadata.
-        picked_inds = sorted_input.loc[sorted_input.species_genotyping == gvcf_folder].ID.iloc[:ind_cut]
+        species_input = sorted_input.loc[sorted_input.species_genotyping == gvcf_folder]
+        if len(species_input) == 1 and species_input.gSEX.iloc[0] == "M":
+            continue # Skip if theres only a single male
+        picked_inds = sorted_input.loc[sorted_input.species_genotyping == gvcf_folder].ID.iloc[:1]
         # Choose all paths based on the regions file.
         batch_name = "{}/filteredVCF/all_samples/bcf_step1/{}_batch{}_fploidy2_mploidy{}.bcf"
         gvcfs_names = starting_dir+batch_name
@@ -179,7 +181,9 @@ for g in metadata_20x_filt.genus.unique()[:3]:
         aut_and_x = pd.concat([aut_l, x_l])
         # print(aut_and_x)
         for ind in picked_inds:
-            multihetsep_args = []
+            if os.path.exists("steps/cobraa/"+ind+"/aut_PSMC_D50_ts4_te34_final_parameters.txt"):
+                continue
+            multihetsep_args, passing_chroms = [], []
             for c in aut_and_x.CONTIG_ID.unique():
             # Batches are either aut/Y-linked or X-linked.
                 mploidy = aut_and_x.loc[aut_and_x.CONTIG_ID == c].MALE_PLOIDY.iloc[0]
@@ -192,6 +196,7 @@ for g in metadata_20x_filt.genus.unique()[:3]:
                     ind_dir["contig"] = c
                     ind_dir["mask"] = mask_names.format(gvcf_folder, gvcf_folder, b, mploidy)
                     ind_dir["callability"] = mask_names.format(gvcf_folder, gvcf_folder, b, mploidy)
+                    passing_chroms.append(c)
                     multihetsep_args.append(ind_dir)
                 else:
                     skipped_cases.append(gvcf_folder)
@@ -202,15 +207,17 @@ for g in metadata_20x_filt.genus.unique()[:3]:
             os.makedirs(cobraa_dir+"/"+ind, exist_ok=True)
             # Aut run
             c_list = []
-            for c in aut_l.CONTIG_ID.unique()[:chr_cut_grid]:
+            for c in aut_l.loc[aut_l.CONTIG_ID.isin(passing_chroms)].CONTIG_ID.unique()[:chr_cut_grid]:
                 c_list.append("steps/multihetsep/{}/{}.txt".format(ind, c))
                 # hetsep_l.append({"multihetsep_l": ["steps/multihetsep/{}/{}.txt".format(i, c)],
                 # "chrom": c})
             hetsep_l.append({"multihetsep_l": c_list, "chrom": "aut_PSMC",
                              "mem": 24})
             x_list = []
-            for c in x_l.CONTIG_ID.unique()[:chr_cut_grid]:
+            for c in x_l.loc[x_l.CONTIG_ID.isin(passing_chroms)].CONTIG_ID.unique()[:chr_cut_grid]:
                 x_list.append("steps/multihetsep/{}/{}.txt".format(ind, c))
+            if len(c_list) == 0:
+                continue
             hetseps_x_l.append({"multihetsep_l": x_list, "chrom": "chrX_PSMC",
                              "mem": 16})
             # Unstructured aut
@@ -228,47 +235,47 @@ for g in metadata_20x_filt.genus.unique()[:3]:
                 i_structured = gwf.map(cobraa_run, i_l,
                                        name=get_ID_structured_cobraa)
             
-                # Pick best and perform cobraa-path.
-                # Decode can only take one file, so iterate through the various contigs
-                decode_l = []
-                for c in aut_l.CONTIG_ID.unique()[:decode_cut]:
-                    decode_d = {}
-                    decode_d["param_l"] = i_structured.outputs
-                    decode_d["chrom"] = d["chrom"]
-                    decode_d["multihetsep"] = "steps/multihetsep/{}/{}.txt".format(ind, c)
-                    decode_d["mem"] = 24
-                    decode_l.append(decode_d)
+                # # Pick best and perform cobraa-path.
+                # # Decode can only take one file, so iterate through the various contigs
+                # decode_l = []
+                # for c in aut_l.loc[aut_l.CONTIG_ID.isin(passing_chroms)].CONTIG_ID.unique()[:decode_cut]:
+                #     decode_d = {}
+                #     decode_d["param_l"] = i_structured.outputs
+                #     decode_d["chrom"] = d["chrom"]
+                #     decode_d["multihetsep"] = "steps/multihetsep/{}/{}.txt".format(ind, c)
+                #     decode_d["mem"] = 24
+                #     decode_l.append(decode_d)
                 
-                gwf.map(cobraa_decode, decode_l,
-                name=get_ID_decode_cobraa)
+                # gwf.map(cobraa_decode, decode_l,
+                # name=get_ID_decode_cobraa)
 
-            # Unstructured X
-            gwf.map(cobraa_run_unstructured, hetseps_x_l,
-                    name=get_ID_unstructured_cobraa)
-            # Structured X search
-            for d in hetseps_x_l:
-                i_l = []
-                for i in range(10, 42, 6):
-                    for j in range(4, i-4, 6):
-                        l = d.copy()
-                        l["ts"] = j
-                        l["te"] = i
-                        i_l.append(l)
-                i_structured = gwf.map(cobraa_run, i_l,
-                                       name=get_ID_structured_cobraa)
+            # # Unstructured X
+            # gwf.map(cobraa_run_unstructured, hetseps_x_l,
+            #         name=get_ID_unstructured_cobraa)
+            # # Structured X search
+            # for d in hetseps_x_l:
+            #     i_l = []
+            #     for i in range(10, 42, 6):
+            #         for j in range(4, i-4, 6):
+            #             l = d.copy()
+            #             l["ts"] = j
+            #             l["te"] = i
+            #             i_l.append(l)
+            #     i_structured = gwf.map(cobraa_run, i_l,
+            #                            name=get_ID_structured_cobraa)
             
-                # Pick best and perform cobraa-path.
-                # Decode can only take one file, so iterate through the various contigs
-                decode_l = []
-                for c in x_l.CONTIG_ID.unique()[:decode_cut]:
-                    decode_d = {}
-                    decode_d["param_l"] = i_structured.outputs
-                    decode_d["chrom"] = d["chrom"]
-                    decode_d["multihetsep"] = "steps/multihetsep/{}/{}.txt".format(ind, c)
-                    decode_d["mem"] = 24
-                    decode_l.append(decode_d)
-                gwf.map(cobraa_decode, decode_l,
-                name=get_ID_decode_cobraa)
+            #     # Pick best and perform cobraa-path.
+            #     # Decode can only take one file, so iterate through the various contigs
+            #     decode_l = []
+            #     for c in x_l.loc[x_l.CONTIG_ID.isin(passing_chroms)].CONTIG_ID.unique()[:decode_cut]:
+            #         decode_d = {}
+            #         decode_d["param_l"] = i_structured.outputs
+            #         decode_d["chrom"] = d["chrom"]
+            #         decode_d["multihetsep"] = "steps/multihetsep/{}/{}.txt".format(ind, c)
+            #         decode_d["mem"] = 24
+            #         decode_l.append(decode_d)
+            #     gwf.map(cobraa_decode, decode_l,
+            #     name=get_ID_decode_cobraa)
 
 print("Problems with", set(skipped_cases))
 
