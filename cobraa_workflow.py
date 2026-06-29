@@ -144,7 +144,7 @@ metadata_20x_filt = metadata_table.loc[(metadata_table.finalQC != "fail")
                              ]
 
 skipped_cases = []
-for g in metadata_20x_filt.genus.unique()[:]:
+for g in metadata_20x_filt.genus.unique()[:25]:
     # Identify IDs
     species_metadata = metadata_20x_filt.loc[metadata_20x_filt.genus == g]
     #species_metadata = species_metadata.loc[species_metadata.cov_chrX >= 5]
@@ -165,7 +165,7 @@ for g in metadata_20x_filt.genus.unique()[:]:
         # Pick the (currently one) best individuals in the metadata.
         species_input = sorted_input.loc[sorted_input.species_genotyping == gvcf_folder]
         if len(species_input) == 1 and species_input.gSEX.iloc[0] == "M":
-            continue # Skip if theres only a single male
+            continue # Skip if there is only a single male
         picked_inds = sorted_input.loc[sorted_input.species_genotyping == gvcf_folder].ID.iloc[:1]
         # Choose all paths based on the regions file.
         batch_name = "{}/filteredVCF/all_samples/bcf_step1/{}_batch{}_fploidy2_mploidy{}.bcf"
