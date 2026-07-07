@@ -17,7 +17,7 @@ window_size = 10 # In kb
 window_size_TD = 100
 step_size_TD = 10
 
-table_desc = "~/primatediversity/data/gVCFs_recalling_10_12_2024_metadata/plots/SupTable_Sample_Stats_wGT_QC.tsv"
+table_desc = "~/primatediversity/data/gVCFs_recalling_10_12_2024_metadata/plots/SupTable_Sample_Stats_wGT_QC_MQ.tsv"
 metadata_table = pd.read_csv(table_desc, sep="\t")
 
 metadata_20x_filt = metadata_table.loc[(metadata_table.finalQC != "fail")
@@ -186,3 +186,4 @@ for s in used_species:
     d["out_bed"] = "{}{}_{}kb_{}step_Tajima_D.bed".format(out_path_lift, s, window_size_TD, step_size_TD)
     map_input.append(d)
 gwf.map(human_bed_lift, map_input, name=get_ID_analyse_bed)
+

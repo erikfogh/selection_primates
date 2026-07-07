@@ -144,6 +144,7 @@ sandbox/
 mmul_ref/
 dna/
 data/*/*
+data/
 picard/
 chain_files/
 cobraa/
